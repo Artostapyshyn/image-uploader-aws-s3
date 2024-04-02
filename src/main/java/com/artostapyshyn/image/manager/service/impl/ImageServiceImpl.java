@@ -8,10 +8,7 @@ import com.amazonaws.services.rekognition.AmazonRekognitionClient;
 import com.amazonaws.services.rekognition.model.*;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
-import com.amazonaws.services.s3.model.CannedAccessControlList;
-import com.amazonaws.services.s3.model.ListObjectsV2Result;
-import com.amazonaws.services.s3.model.PutObjectRequest;
-import com.amazonaws.services.s3.model.S3ObjectSummary;
+import com.amazonaws.services.s3.model.*;
 import com.artostapyshyn.image.manager.service.ImageService;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,7 +19,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 
@@ -50,20 +46,27 @@ public class ImageServiceImpl implements ImageService {
 
     @PostConstruct
     private void initializeAmazon() {
+
         AWSCredentials credentials = new BasicAWSCredentials(this.accessKey, this.secretKey);
-        this.s3client = new AmazonS3Client(credentials);
+        this.s3client = AmazonS3Client.builder()
+                .withRegion(region)
+                .withCredentials(new AWSStaticCredentialsProvider(credentials))
+                .build();
+
         this.rekognitionClient = AmazonRekognitionClient.builder()
                 .withRegion(region)
                 .withCredentials(new AWSStaticCredentialsProvider(credentials))
                 .build();
+
     }
 
     @Override
     public void uploadFile(MultipartFile multipartFile) {
+
         try {
             File file = convertMultiPartToFile(multipartFile);
-            String fileName = generateFileName(multipartFile);
-            uploadFileTos3bucket(fileName, file);
+            uploadFileTos3bucket(multipartFile.getOriginalFilename(), file);
+
         } catch (IOException e) {
             throw new RuntimeException("Failed to convert multipart file to file", e);
         }
@@ -112,13 +115,19 @@ public class ImageServiceImpl implements ImageService {
         return convFile;
     }
 
-    private String generateFileName(MultipartFile multiPart) {
-        return new Date().getTime() + "-" + Objects.requireNonNull(multiPart.getOriginalFilename())
-                .replace(" ", "_");
-    }
-
     private void uploadFileTos3bucket(String fileName, File file) {
-        s3client.putObject(new PutObjectRequest(bucketName, fileName, file)
-                .withCannedAcl(CannedAccessControlList.PublicRead));
+
+        try {
+            PutObjectRequest request = new PutObjectRequest(bucketName, fileName, file);
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentType("plain/text");
+            metadata.addUserMetadata("title", "text");
+            request.setCannedAcl(CannedAccessControlList.PublicRead);
+            request.setMetadata(metadata);
+            s3client.putObject(request);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to upload file to S3 bucket.", e);
+        }
     }
 }
