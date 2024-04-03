@@ -107,7 +107,7 @@ public class ImageServiceImpl implements ImageService {
         return imageUrls;
     }
 
-    private File convertMultiPartToFile(MultipartFile file) throws IOException {
+    public File convertMultiPartToFile(MultipartFile file) throws IOException {
         File convFile = new File(Objects.requireNonNull(file.getOriginalFilename()));
         FileOutputStream fos = new FileOutputStream(convFile);
         fos.write(file.getBytes());
@@ -115,7 +115,7 @@ public class ImageServiceImpl implements ImageService {
         return convFile;
     }
 
-    private void uploadFileTos3bucket(String fileName, File file) {
+    public void uploadFileTos3bucket(String fileName, File file) {
 
         try {
             PutObjectRequest request = new PutObjectRequest(bucketName, fileName, file);
